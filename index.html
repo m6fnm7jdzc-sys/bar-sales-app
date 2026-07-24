@@ -3,50 +3,87 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>売上管理システム（共有版）</title>
+<title>売上管理システム</title>
 <style>
-  * { box-sizing: border-box; margin:0; padding:0; }
-  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background:#111; color:#fff; padding:16px; padding-bottom:80px; }
-  h1 { text-align:center; color:#d4af37; font-size:1.3rem; margin-bottom:14px; letter-spacing:1px; }
-  .summary-bar { display:flex; justify-content:space-between; background:#1c1c1c; border:1px solid #d4af37; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:0.85rem; }
-  .summary-bar div { text-align:center; }
-  .summary-bar .val { color:#d4af37; font-weight:bold; font-size:1.05rem; }
-  .add-row { display:flex; gap:8px; margin-bottom:16px; }
-  .add-row input { flex:1; padding:10px; border-radius:8px; border:1px solid #d4af37; background:#222; color:#fff; font-size:1rem; }
-  .btn-gold { background:#d4af37; color:#111; border:none; border-radius:8px; padding:10px 16px; font-weight:bold; cursor:pointer; }
-  .card { background:#1c1c1c; border:1px solid #333; border-radius:12px; padding:14px; margin-bottom:14px; }
-  .card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px; }
-  .card-head .name { font-weight:bold; color:#d4af37; font-size:1.05rem; }
-  .head-btns button { margin-left:6px; font-size:0.75rem; padding:5px 9px; border-radius:6px; border:none; cursor:pointer; }
-  .btn-show { background:#3a6ea5; color:#fff; }
-  .btn-checkout { background:#2e8b57; color:#fff; }
-  .btn-del { background:#a33; color:#fff; }
-  .menu-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #2a2a2a; font-size:0.85rem; }
-  .menu-row:last-child { border-bottom:none; }
-  .menu-name { flex:1; color:#ddd; }
-  .menu-price { color:#d4af37; width:70px; text-align:right; font-size:0.8rem; }
-  .qty-ctrl { display:flex; align-items:center; gap:6px; margin-left:8px; }
-  .qty-ctrl button { width:26px; height:26px; border-radius:50%; border:1px solid #d4af37; background:transparent; color:#d4af37; font-size:1rem; }
-  .qty-num { width:20px; text-align:center; font-weight:bold; }
-  .subtotal { display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid #d4af3755; font-weight:bold; }
-  .subtotal .amt { color:#d4af37; }
-  .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:50; align-items:center; justify-content:center; padding:20px; }
-  .modal-bg.show { display:flex; }
-  .receipt { background:#fff; color:#111; border-radius:12px; padding:24px; width:100%; max-width:380px; }
-  .receipt h2 { text-align:center; margin-bottom:10px; }
-  .receipt .r-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #ccc; font-size:0.95rem; }
-  .receipt .r-total { display:flex; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:2px solid #111; font-size:1.5rem; font-weight:bold; color:#c0392b; }
-  .receipt .close-btn { width:100%; margin-top:16px; padding:12px; background:#111; color:#fff; border:none; border-radius:8px; font-size:1rem; }
-  .history-toggle { text-align:center; margin:20px 0 10px; }
-  .history-toggle button { background:none; border:1px solid #666; color:#aaa; padding:8px 16px; border-radius:20px; font-size:0.85rem; }
-  .history-list { display:none; }
-  .history-list.show { display:block; }
-  .history-item { background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:10px; margin-bottom:8px; font-size:0.8rem; color:#bbb; display:flex; justify-content:space-between; }
-  .history-item .h-amt { color:#d4af37; font-weight:bold; }
-  .footer-actions { text-align:center; margin-top:24px; }
-  .footer-actions button { background:none; border:1px solid #a33; color:#e88; padding:8px 14px; border-radius:8px; font-size:0.8rem; }
-  .empty { text-align:center; color:#555; padding:30px 0; }
-  #loading { text-align:center; color:#d4af37; padding:40px 0; font-size:1rem; font-weight:bold; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; background:#111; color:#fff; padding:14px; padding-bottom:90px; }
+h1 { text-align:center; color:#d4af37; font-size:1.25rem; margin-bottom:14px; letter-spacing:1px; }
+#loading { text-align:center; color:#d4af37; padding:50px 0; font-weight:bold; }
+
+.summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.summary-box { background:#1c1c1c; border:1px solid #333; border-radius:8px; padding:10px; text-align:center; }
+.summary-box.total { grid-column:span 2; border-color:#d4af37; background:#2a2411; }
+.summary-box .lbl { font-size:0.72rem; color:#aaa; margin-bottom:4px; }
+.summary-box .val { font-size:1.05rem; font-weight:bold; color:#fff; }
+.summary-box.total .val { color:#d4af37; font-size:1.3rem; }
+
+.add-row { display:flex; gap:8px; margin-bottom:10px; }
+.add-row input, #searchInput { flex:1; padding:10px; border-radius:8px; border:1px solid #d4af37; background:#222; color:#fff; font-size:1rem; }
+#searchInput { margin-bottom:10px; border-color:#555; }
+.btn-gold { background:#d4af37; color:#111; border:none; border-radius:8px; padding:0 16px; font-weight:bold; cursor:pointer; }
+
+.tabs { display:flex; gap:8px; margin-bottom:12px; }
+.tab-btn { flex:1; text-align:center; padding:8px; border-radius:8px; border:1px solid #444; background:#1c1c1c; color:#aaa; font-size:0.85rem; cursor:pointer; }
+.tab-btn.active { background:#d4af37; color:#111; font-weight:bold; border-color:#d4af37; }
+
+.customer-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(95px,1fr)); gap:10px; margin-bottom:20px; }
+.c-tile { background:#222; border:1px solid #444; border-radius:8px; padding:12px 6px; text-align:center; cursor:pointer; }
+.c-tile.has-bal { border-color:#e74c3c; background:#3a1c1c; }
+.c-tile .c-name { font-weight:bold; font-size:0.9rem; margin-bottom:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.c-tile .c-bal { font-size:0.72rem; color:#8bc48b; }
+.c-tile.has-bal .c-bal { color:#ff7675; font-weight:bold; }
+
+.history-toggle { text-align:center; margin:16px 0 8px; }
+.history-toggle button { background:none; border:1px solid #555; color:#aaa; padding:7px 16px; border-radius:20px; font-size:0.8rem; }
+.history-list { display:none; }
+.history-list.show { display:block; }
+.history-item { background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:0.78rem; color:#ccc; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.history-item .h-amt { color:#d4af37; font-weight:bold; margin-left:auto; }
+.h-cancel { background:#a33; color:#fff; border:none; padding:3px 8px; border-radius:5px; font-size:0.7rem; cursor:pointer; }
+
+.footer-actions { text-align:center; margin-top:20px; }
+.footer-actions button { background:none; border:1px solid #a33; color:#e88; padding:8px 14px; border-radius:8px; font-size:0.8rem; }
+.empty { text-align:center; color:#555; padding:24px 0; }
+
+.m-cash { color:#a5d6a7; }
+.m-qr { color:#90caf9; }
+.m-credit { color:#f48fb1; }
+
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:50; align-items:center; justify-content:center; padding:16px; }
+.modal-bg.show { display:flex; }
+.modal-content { background:#1c1c1c; border:1px solid #d4af37; border-radius:12px; width:100%; max-width:400px; max-height:92vh; overflow-y:auto; padding:20px; position:relative; }
+.close-x { position:absolute; top:10px; right:14px; font-size:1.6rem; color:#aaa; background:none; border:none; cursor:pointer; }
+.m-title { font-size:1.15rem; font-weight:bold; color:#d4af37; margin-bottom:6px; padding-right:24px; }
+.status-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; font-size:0.8rem; color:#aaa; }
+.btn-toggle { background:#333; color:#eee; border:1px solid #666; border-radius:6px; padding:5px 10px; font-size:0.72rem; cursor:pointer; }
+
+.menu-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #333; font-size:0.85rem; }
+.menu-name { flex:1; color:#ddd; padding-right:8px; }
+.qty-ctrl { display:flex; align-items:center; gap:8px; }
+.qty-ctrl button { width:30px; height:30px; border-radius:50%; border:1px solid #d4af37; background:transparent; color:#d4af37; font-size:1.1rem; }
+.qty-num { width:22px; text-align:center; font-weight:bold; }
+
+.calc-area { background:#111; border-radius:8px; padding:12px; margin:16px 0; }
+.calc-row { display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.9rem; }
+.calc-row.total { font-weight:bold; color:#d4af37; font-size:1.05rem; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:8px; }
+.calc-row.bal { font-weight:bold; color:#ff7675; font-size:1.05rem; margin-top:8px; border-top:1px dashed #444; padding-top:8px; }
+
+.pay-action { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.pay-input-row { display:flex; align-items:center; gap:8px; }
+.pay-input-row input { flex:1; padding:10px; font-size:1.1rem; text-align:right; border-radius:8px; border:1px solid #555; background:#000; color:#fff; }
+.pay-btns { display:flex; gap:8px; }
+.pay-btns button { flex:1; padding:11px 0; font-weight:bold; border:none; border-radius:8px; cursor:pointer; color:#fff; font-size:0.85rem; }
+.btn-cash { background:#27ae60; }
+.btn-qr { background:#2980b9; }
+.btn-credit { background:#d35400; }
+
+.m-history-title { font-size:0.85rem; color:#d4af37; margin:6px 0 8px; }
+.m-hist-item { display:flex; align-items:center; gap:6px; font-size:0.78rem; background:#242424; border-radius:6px; padding:6px 8px; margin-bottom:5px; flex-wrap:wrap; }
+.m-hist-amt { margin-left:auto; font-weight:bold; color:#d4af37; }
+.m-hist-cancel { background:#a33; color:#fff; border:none; padding:2px 7px; border-radius:5px; font-size:0.68rem; cursor:pointer; }
+
+.del-btn-wrap { text-align:center; margin-top:20px; }
+.btn-del { background:none; border:1px solid #a33; color:#e88; padding:8px 16px; border-radius:8px; font-size:0.8rem; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -55,33 +92,79 @@
 <div id="loading">📡 データベースに接続中...</div>
 
 <div id="appContent" style="display:none;">
-  <div class="summary-bar">
-    <div>オープン中<br><span class="val" id="openTotal">¥0</span></div>
-    <div>本日会計済み<br><span class="val" id="doneTotal">¥0</span></div>
-    <div>本日合計<br><span class="val" id="grandTotal">¥0</span></div>
+  <div class="summary-grid">
+    <div class="summary-box total">
+      <div class="lbl">本日の総売上（支払済）</div>
+      <div class="val" id="sumTotal">¥0</div>
+    </div>
+    <div class="summary-box"><div class="lbl">💴 現金</div><div class="val" id="sumCash">¥0</div></div>
+    <div class="summary-box"><div class="lbl">📱 QR決済</div><div class="val" id="sumQr">¥0</div></div>
+    <div class="summary-box"><div class="lbl">💳 クレジット</div><div class="val" id="sumCredit">¥0</div></div>
+    <div class="summary-box" style="grid-column:span 2;"><div class="lbl">⚠️ 未払い残高合計</div><div class="val" id="sumBal" style="color:#ff7675;">¥0</div></div>
   </div>
+
   <div class="add-row">
     <input type="text" id="nameInput" placeholder="お客様名 / テーブル名">
     <button class="btn-gold" onclick="addCustomer()">＋追加</button>
   </div>
-  <div id="customerList"></div>
-  <div class="empty" id="emptyMsg">お客様を追加してください</div>
+
+  <input type="text" id="searchInput" placeholder="🔍 名前で検索" oninput="render()">
+
+  <div class="tabs">
+    <div class="tab-btn active" id="tabOpen" onclick="switchTab('open')">🟡 接客中</div>
+    <div class="tab-btn" id="tabDone" onclick="switchTab('done')">✅ 会計済み（退店済）</div>
+  </div>
+
+  <div class="customer-grid" id="customerGrid"></div>
+  <div class="empty" id="emptyGrid">お客様がいません</div>
+
   <div class="history-toggle">
-    <button onclick="toggleHistory()">📖 本日の会計履歴を表示／非表示</button>
+    <button onclick="toggleHistory()">📖 本日の支払い履歴を表示／非表示</button>
   </div>
   <div class="history-list" id="historyList"></div>
+
   <div class="footer-actions">
     <button onclick="resetAll()">🗑 本日の営業終了（全データリセット）</button>
   </div>
 </div>
 
 <div class="modal-bg" id="modalBg">
-  <div class="receipt">
-    <h2>お会計確認</h2>
-    <div style="text-align:center;margin-bottom:10px;"><b id="rName"></b> 様</div>
-    <div id="rItems"></div>
-    <div class="r-total"><span>合計</span><span id="rTotal">¥0</span></div>
-    <button class="close-btn" onclick="closeReceipt()">閉じる</button>
+  <div class="modal-content">
+    <button class="close-x" onclick="closeModal()">×</button>
+    <div class="m-title" id="mTitle"></div>
+    <div class="status-row">
+      <span id="mStatusLabel"></span>
+      <button class="btn-toggle" id="mToggleBtn" onclick="toggleCheckedOut()"></button>
+    </div>
+
+    <div id="mMenuItems"></div>
+
+    <div class="calc-area">
+      <div class="calc-row total"><span>注文合計</span><span id="mOrderTotal">¥0</span></div>
+      <div class="calc-row"><span>支払い済み合計</span><span id="mPaidTotal">¥0</span></div>
+      <div class="calc-row bal"><span>未払い残高</span><span id="mBalance">¥0</span></div>
+    </div>
+
+    <div class="pay-action">
+      <div style="font-size:0.8rem;color:#aaa;">▼ 受け取る金額を確認し、支払い方法をタップしてください</div>
+      <div class="pay-input-row">
+        <span>¥</span>
+        <input type="number" id="payAmount">
+      </div>
+      <div class="pay-btns">
+        <button class="btn-cash" onclick="addPayment('cash')">💴 現金</button>
+        <button class="btn-qr" onclick="addPayment('qr')">📱 QR</button>
+        <button class="btn-credit" onclick="addPayment('credit')">💳 クレカ</button>
+      </div>
+    </div>
+
+    <div class="m-history-title">この方の支払い履歴</div>
+    <div id="mHistoryList"></div>
+
+    <div class="del-btn-wrap">
+      <button class="btn-del" onclick="deleteCustomer()">🗑 このお客様をリストから削除</button>
+      <div style="font-size:0.7rem;color:#666;margin-top:4px;">※支払い履歴は削除されません</div>
+    </div>
   </div>
 </div>
 
@@ -113,17 +196,21 @@ const MENU = [
   { id:'ferris',     name:'ショット観覧車', price:5000 },
 ];
 
+const METHOD_LABEL = { cash:'💴 現金', qr:'📱 QR', credit:'💳 クレカ' };
+const METHOD_CLASS = { cash:'m-cash', qr:'m-qr', credit:'m-credit' };
+
 let customers = [];
 let history = [];
 let nextId = 1;
-let currentReceiptId = null;
+let currentCid = null;
+let currentTab = 'open';
 
-onSnapshot(docRef, (docSnap) => {
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    customers = data.customers || [];
-    history   = data.history   || [];
-    nextId    = data.nextId    || 1;
+onSnapshot(docRef, (snap) => {
+  if (snap.exists()) {
+    const d = snap.data();
+    customers = d.customers || [];
+    history   = d.history   || [];
+    nextId    = d.nextId    || 1;
   } else {
     customers = []; history = []; nextId = 1;
     saveState();
@@ -131,156 +218,196 @@ onSnapshot(docRef, (docSnap) => {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('appContent').style.display = 'block';
   render();
-}, (error) => {
+}, (err) => {
   document.getElementById('loading').textContent = '⚠️ 接続エラー：電波状況やFirebaseのルール設定を確認してください';
-  console.error(error);
+  console.error(err);
 });
 
-async function saveState() {
+async function saveState(){
   await setDoc(docRef, { customers, history, nextId });
 }
-
-function escHtml(s) {
+function esc(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-window.addCustomer = function() {
-  const input = document.getElementById('nameInput');
-  const name = input.value.trim();
-  if (!name) return;
-  customers.push({ id: nextId++, name, items: {} });
-  input.value = '';
-  saveState();
-};
-
-document.getElementById('nameInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') window.addCustomer();
-});
-
-window.deleteCustomer = function(id) {
-  if (!confirm('このお客様の情報を削除しますか？')) return;
-  customers = customers.filter(c => c.id !== id);
-  saveState();
-};
-
-window.changeQty = function(cid, mid, delta) {
-  const c = customers.find(c => c.id === cid);
-  if (!c) return;
-  const cur = c.items[mid] || 0;
-  const next = Math.max(0, cur + delta);
-  if (next === 0) delete c.items[mid];
-  else c.items[mid] = next;
-  saveState();
-};
-
-function calcTotal(customer) {
-  let total = 0;
-  const breakdown = [];
-  for (const [mid, qty] of Object.entries(customer.items)) {
-    if (!qty) continue;
-    const menu = MENU.find(m => m.id === mid);
-    if (!menu) continue;
-    const sub = menu.price * qty;
-    total += sub;
-    breakdown.push({ name: menu.name, qty, price: menu.price, sub });
+function calcCustomerData(c){
+  let orderTotal = 0;
+  for(const [mid, qty] of Object.entries(c.items||{})){
+    const m = MENU.find(x=>x.id===mid);
+    if(m) orderTotal += m.price*qty;
   }
-  return { total, breakdown };
+  const paidTotal = history.filter(h=>h.cid===c.id).reduce((s,h)=>s+h.amount,0);
+  return { orderTotal, paidTotal, balance: orderTotal - paidTotal };
 }
 
-window.checkout = function(cid) {
-  const idx = customers.findIndex(c => c.id === cid);
-  if (idx === -1) return;
-  const c = customers[idx];
-  const { total, breakdown } = calcTotal(c);
-  if (total === 0) { alert('注文がありません'); return; }
-  if (!confirm(`${c.name} 様　合計 ¥${total.toLocaleString()} で会計を確定しますか？`)) return;
-  history.unshift({
-    id: Date.now(), name: c.name, breakdown, total,
-    time: new Date().toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
-  });
-  customers.splice(idx, 1);
+window.addCustomer = function(){
+  const input = document.getElementById('nameInput');
+  const name = input.value.trim();
+  if(!name) return;
+  const newId = nextId++;
+  customers.push({ id:newId, name, items:{}, checkedOut:false });
+  input.value = '';
   saveState();
-};
-
-window.openReceipt = function(cid) {
-  currentReceiptId = cid;
   render();
+  window.openModal(newId);
+};
+document.getElementById('nameInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter') window.addCustomer();
+});
+
+window.openModal = function(cid){
+  currentCid = cid;
+  renderModal();
   document.getElementById('modalBg').classList.add('show');
 };
-
-window.closeReceipt = function() {
+window.closeModal = function(){
   document.getElementById('modalBg').classList.remove('show');
-  currentReceiptId = null;
+  currentCid = null;
 };
 
-window.toggleHistory = function() {
+window.changeQty = function(mid, delta){
+  const c = customers.find(c=>c.id===currentCid);
+  if(!c) return;
+  if(!c.items) c.items = {};
+  const cur = c.items[mid] || 0;
+  const next = Math.max(0, cur+delta);
+  if(next===0) delete c.items[mid]; else c.items[mid]=next;
+  saveState(); renderModal(); render();
+};
+
+window.addPayment = function(method){
+  const c = customers.find(x=>x.id===currentCid);
+  if(!c) return;
+  const amtInput = document.getElementById('payAmount');
+  const amount = parseInt(amtInput.value, 10);
+  if(isNaN(amount) || amount<=0){ alert('正しい金額を入力してください'); return; }
+  if(!confirm(`${c.name} 様から ${METHOD_LABEL[method]} で ¥${amount.toLocaleString()} 受け取りました。記録しますか？`)) return;
+  history.unshift({
+    id: Date.now()+Math.floor(Math.random()*1000),
+    cid: c.id,
+    name: c.name,
+    amount, method,
+    time: new Date().toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+  });
+  saveState(); renderModal(); render();
+};
+
+window.cancelPayment = function(hid){
+  if(!confirm('この支払い履歴を取り消しますか？\n受け取った金額は「未払い残高」に戻ります。')) return;
+  history = history.filter(h=>h.id!==hid);
+  saveState(); renderModal(); render();
+};
+
+window.toggleCheckedOut = function(){
+  const c = customers.find(x=>x.id===currentCid);
+  if(!c) return;
+  c.checkedOut = !c.checkedOut;
+  saveState(); renderModal(); render();
+};
+
+window.deleteCustomer = function(){
+  if(!confirm('このお客様をリストから削除しますか？（支払い履歴は残ります）')) return;
+  customers = customers.filter(c=>c.id!==currentCid);
+  saveState(); closeModal(); render();
+};
+
+window.switchTab = function(tab){
+  currentTab = tab;
+  document.getElementById('tabOpen').classList.toggle('active', tab==='open');
+  document.getElementById('tabDone').classList.toggle('active', tab==='done');
+  render();
+};
+window.toggleHistory = function(){
   document.getElementById('historyList').classList.toggle('show');
 };
-
-window.resetAll = function() {
-  if (!confirm('本日の全データ（オープン中・履歴）を消去します。よろしいですか？')) return;
+window.resetAll = function(){
+  if(!confirm('本日の全データ（お客様・支払い履歴）を消去します。よろしいですか？')) return;
   customers = []; history = []; nextId = 1;
   saveState();
 };
 
-function render() {
-  const list  = document.getElementById('customerList');
-  const empty = document.getElementById('emptyMsg');
-  empty.style.display = customers.length === 0 ? 'block' : 'none';
+function renderModal(){
+  if(currentCid===null) return;
+  const c = customers.find(x=>x.id===currentCid);
+  if(!c){ closeModal(); return; }
 
-  list.innerHTML = customers.map(c => {
-    const { total } = calcTotal(c);
-    const rows = MENU.map(m => {
-      const qty = c.items[m.id] || 0;
-      return `<div class="menu-row">
-        <span class="menu-name">${m.name}</span>
-        <span class="menu-price">¥${m.price.toLocaleString()}</span>
-        <div class="qty-ctrl">
-          <button onclick="changeQty(${c.id},'${m.id}',-1)">－</button>
-          <span class="qty-num">${qty}</span>
-          <button onclick="changeQty(${c.id},'${m.id}',1)">＋</button>
-        </div>
-      </div>`;
-    }).join('');
-    return `<div class="card">
-      <div class="card-head">
-        <span class="name">👤 ${escHtml(c.name)}</span>
-        <span class="head-btns">
-          <button class="btn-show" onclick="openReceipt(${c.id})">お客様に見せる</button>
-          <button class="btn-checkout" onclick="checkout(${c.id})">会計確定</button>
-          <button class="btn-del" onclick="deleteCustomer(${c.id})">削除</button>
-        </span>
+  document.getElementById('mTitle').textContent = `👤 ${c.name} 様`;
+  document.getElementById('mStatusLabel').textContent = c.checkedOut ? '✅ 会計済み（退店済）' : '🟡 接客中';
+  document.getElementById('mToggleBtn').textContent = c.checkedOut ? '接客中に戻す' : '退店（会計済みにする）';
+
+  const rows = MENU.map(m=>{
+    const qty = (c.items && c.items[m.id]) || 0;
+    return `<div class="menu-row">
+      <span class="menu-name">${m.name}<br><small style="color:#d4af37">¥${m.price.toLocaleString()}</small></span>
+      <div class="qty-ctrl">
+        <button onclick="changeQty('${m.id}',-1)">－</button>
+        <span class="qty-num">${qty}</span>
+        <button onclick="changeQty('${m.id}',1)">＋</button>
       </div>
-      ${rows}
-      <div class="subtotal"><span>小計</span><span class="amt">¥${total.toLocaleString()}</span></div>
+    </div>`;
+  }).join('');
+  document.getElementById('mMenuItems').innerHTML = rows;
+
+  const data = calcCustomerData(c);
+  document.getElementById('mOrderTotal').textContent = `¥${data.orderTotal.toLocaleString()}`;
+  document.getElementById('mPaidTotal').textContent  = `¥${data.paidTotal.toLocaleString()}`;
+  document.getElementById('mBalance').textContent    = `¥${data.balance.toLocaleString()}`;
+  document.getElementById('payAmount').value = data.balance>0 ? data.balance : '';
+
+  const myHist = history.filter(h=>h.cid===c.id);
+  document.getElementById('mHistoryList').innerHTML = myHist.length===0
+    ? '<div style="color:#666;font-size:0.8rem;padding:6px 0;">まだ支払い記録はありません</div>'
+    : myHist.map(h=>`<div class="m-hist-item">
+        <span>${h.time}</span>
+        <span class="${METHOD_CLASS[h.method]}">${METHOD_LABEL[h.method]}</span>
+        <span class="m-hist-amt">¥${h.amount.toLocaleString()}</span>
+        <button class="m-hist-cancel" onclick="cancelPayment(${h.id})">取消</button>
+      </div>`).join('');
+}
+
+function render(){
+  const sumCash = history.filter(h=>h.method==='cash').reduce((s,h)=>s+h.amount,0);
+  const sumQr   = history.filter(h=>h.method==='qr').reduce((s,h)=>s+h.amount,0);
+  const sumCredit = history.filter(h=>h.method==='credit').reduce((s,h)=>s+h.amount,0);
+  const sumTotal = sumCash+sumQr+sumCredit;
+
+  let sumBal = 0;
+  customers.forEach(c=>{ sumBal += calcCustomerData(c).balance; });
+
+  document.getElementById('sumTotal').textContent = `¥${sumTotal.toLocaleString()}`;
+  document.getElementById('sumCash').textContent = `¥${sumCash.toLocaleString()}`;
+  document.getElementById('sumQr').textContent = `¥${sumQr.toLocaleString()}`;
+  document.getElementById('sumCredit').textContent = `¥${sumCredit.toLocaleString()}`;
+  document.getElementById('sumBal').textContent = `¥${sumBal.toLocaleString()}`;
+
+  const searchTerm = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  let filtered = customers.filter(c => currentTab==='open' ? !c.checkedOut : c.checkedOut);
+  if(searchTerm) filtered = filtered.filter(c=>c.name.toLowerCase().includes(searchTerm));
+  filtered = filtered.slice().reverse();
+
+  const grid = document.getElementById('customerGrid');
+  const empty = document.getElementById('emptyGrid');
+  empty.style.display = filtered.length===0 ? 'block':'none';
+
+  grid.innerHTML = filtered.map(c=>{
+    const data = calcCustomerData(c);
+    const hasBal = data.balance>0;
+    return `<div class="c-tile ${hasBal?'has-bal':''}" onclick="openModal(${c.id})">
+      <div class="c-name">${esc(c.name)}</div>
+      <div class="c-bal">${hasBal?`未払¥${data.balance.toLocaleString()}`:'支払済'}</div>
     </div>`;
   }).join('');
 
   const hList = document.getElementById('historyList');
-  hList.innerHTML = history.length === 0
-    ? '<div class="empty">まだ会計履歴はありません</div>'
-    : history.map(h => `<div class="history-item">
-        <span>${h.time}　${escHtml(h.name)} 様</span>
-        <span class="h-amt">¥${h.total.toLocaleString()}</span>
+  hList.innerHTML = history.length===0
+    ? '<div class="empty">まだ支払い履歴はありません</div>'
+    : history.map(h=>`<div class="history-item">
+        <span>${h.time} ${esc(h.name)}様</span>
+        <span class="${METHOD_CLASS[h.method]}">${METHOD_LABEL[h.method]}</span>
+        <span class="h-amt">¥${h.amount.toLocaleString()}</span>
+        <button class="h-cancel" onclick="cancelPayment(${h.id})">取消</button>
       </div>`).join('');
 
-  const openTotal  = customers.reduce((s, c) => s + calcTotal(c).total, 0);
-  const doneTotal  = history.reduce((s, h) => s + h.total, 0);
-  document.getElementById('openTotal').textContent  = `¥${openTotal.toLocaleString()}`;
-  document.getElementById('doneTotal').textContent  = `¥${doneTotal.toLocaleString()}`;
-  document.getElementById('grandTotal').textContent = `¥${(openTotal + doneTotal).toLocaleString()}`;
-
-  if (currentReceiptId !== null) {
-    const c = customers.find(c => c.id === currentReceiptId);
-    if (c) {
-      const { total, breakdown } = calcTotal(c);
-      document.getElementById('rName').textContent = c.name;
-      document.getElementById('rItems').innerHTML = breakdown.length === 0
-        ? '<div style="text-align:center;color:#888;">注文がありません</div>'
-        : breakdown.map(b => `<div class="r-row"><span>${b.name} ×${b.qty}</span><span>¥${b.sub.toLocaleString()}</span></div>`).join('');
-      document.getElementById('rTotal').textContent = `¥${total.toLocaleString()}`;
-    }
-  }
+  if(currentCid!==null) renderModal();
 }
 </script>
 </body>
