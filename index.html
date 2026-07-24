@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>売上管理システム（共有版）</title>
+<style>
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background:#111; color:#fff; padding:16px; padding-bottom:80px; }
+  h1 { text-align:center; color:#d4af37; font-size:1.3rem; margin-bottom:14px; letter-spacing:1px; }
+  .summary-bar { display:flex; justify-content:space-between; background:#1c1c1c; border:1px solid #d4af37; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:0.85rem; }
+  .summary-bar div { text-align:center; }
+  .summary-bar .val { color:#d4af37; font-weight:bold; font-size:1.05rem; }
+  .add-row { display:flex; gap:8px; margin-bottom:16px; }
+  .add-row input { flex:1; padding:10px; border-radius:8px; border:1px solid #d4af37; background:#222; color:#fff; font-size:1rem; }
+  .btn-gold { background:#d4af37; color:#111; border:none; border-radius:8px; padding:10px 16px; font-weight:bold; cursor:pointer; }
+  .card { background:#1c1c1c; border:1px solid #333; border-radius:12px; padding:14px; margin-bottom:14px; }
+  .card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px; }
+  .card-head .name { font-weight:bold; color:#d4af37; font-size:1.05rem; }
+  .head-btns button { margin-left:6px; font-size:0.75rem; padding:5px 9px; border-radius:6px; border:none; cursor:pointer; }
+  .btn-show { background:#3a6ea5; color:#fff; }
+  .btn-checkout { background:#2e8b57; color:#fff; }
+  .btn-del { background:#a33; color:#fff; }
+  .menu-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #2a2a2a; font-size:0.85rem; }
+  .menu-row:last-child { border-bottom:none; }
+  .menu-name { flex:1; color:#ddd; }
+  .menu-price { color:#d4af37; width:70px; text-align:right; font-size:0.8rem; }
+  .qty-ctrl { display:flex; align-items:center; gap:6px; margin-left:8px; }
+  .qty-ctrl button { width:26px; height:26px; border-radius:50%; border:1px solid #d4af37; background:transparent; color:#d4af37; font-size:1rem; }
+  .qty-num { width:20px; text-align:center; font-weight:bold; }
+  .subtotal { display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid #d4af3755; font-weight:bold; }
+  .subtotal .amt { color:#d4af37; }
+  .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:50; align-items:center; justify-content:center; padding:20px; }
+  .modal-bg.show { display:flex; }
+  .receipt { background:#fff; color:#111; border-radius:12px; padding:24px; width:100%; max-width:380px; }
+  .receipt h2 { text-align:center; margin-bottom:10px; }
+  .receipt .r-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #ccc; font-size:0.95rem; }
+  .receipt .r-total { display:flex; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:2px solid #111; font-size:1.5rem; font-weight:bold; color:#c0392b; }
+  .receipt .close-btn { width:100%; margin-top:16px; padding:12px; background:#111; color:#fff; border:none; border-radius:8px; font-size:1rem; }
+  .history-toggle { text-align:center; margin:20px 0 10px; }
+  .history-toggle button { background:none; border:1px solid #666; color:#aaa; padding:8px 16px; border-radius:20px; font-size:0.85rem; }
+  .history-list { display:none; }
+  .history-list.show { display:block; }
+  .history-item { background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:10px; margin-bottom:8px; font-size:0.8rem; color:#bbb; display:flex; justify-content:space-between; }
+  .history-item .h-amt { color:#d4af37; font-weight:bold; }
+  .footer-actions { text-align:center; margin-top:24px; }
+  .footer-actions button { background:none; border:1px solid #a33; color:#e88; padding:8px 14px; border-radius:8px; font-size:0.8rem; }
+  .empty { text-align:center; color:#555; padding:30px 0; }
+  #loading { text-align:center; color:#d4af37; padding:40px 0; font-size:1rem; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h1>🥂 売上管理システム</h1>
+<div id="loading">📡 データベースに接続中...</div>
+
+<div id="appContent" style="display:none;">
+  <div class="summary-bar">
+    <div>オープン中<br><span class="val" id="openTotal">¥0</span></div>
+    <div>本日会計済み<br><span class="val" id="doneTotal">¥0</span></div>
+    <div>本日合計<br><span class="val" id="grandTotal">¥0</span></div>
+  </div>
+  <div class="add-row">
+    <input type="text" id="nameInput" placeholder="お客様名 / テーブル名">
+    <button class="btn-gold" onclick="addCustomer()">＋追加</button>
+  </div>
+  <div id="customerList"></div>
+  <div class="empty" id="emptyMsg">お客様を追加してください</div>
+  <div class="history-toggle">
+    <button onclick="toggleHistory()">📖 本日の会計履歴を表示／非表示</button>
+  </div>
+  <div class="history-list" id="historyList"></div>
+  <div class="footer-actions">
+    <button onclick="resetAll()">🗑 本日の営業終了（全データリセット）</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="receipt">
+    <h2>お会計確認</h2>
+    <div style="text-align:center;margin-bottom:10px;"><b id="rName"></b> 様</div>
+    <div id="rItems"></div>
+    <div class="r-total"><span>合計</span><span id="rTotal">¥0</span></div>
+    <button class="close-btn" onclick="closeReceipt()">閉じる</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDKGr82qocIKQXgLLWFWVUWa6q-7NwbZB4",
+  authDomain: "bar-sales-19a45.firebaseapp.com",
+  projectId: "bar-sales-19a45",
+  storageBucket: "bar-sales-19a45.firebasestorage.app",
+  messagingSenderId: "850237380521",
+  appId: "1:850237380521:web:fc2e2762bb29e9faad56b8",
+  measurementId: "G-6GK5NBBLKD"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const docRef = doc(db, "bar_data", "main_state");
+
+const MENU = [
+  { id:'plan_early', name:'飲み放題（21:00〜0:00）', price:3000 },
+  { id:'plan_late',  name:'飲み放題（0:00以降ご来店）', price:4000 },
+  { id:'ext_male',   name:'0:00以降 延長（男性）', price:3000 },
+  { id:'ext_female', name:'0:00以降 延長（女性）', price:2000 },
+  { id:'orishan',    name:'オリシャン', price:15000 },
+  { id:'shot',       name:'ショット（テキーラ・イェーガー）', price:500 },
+  { id:'ferris',     name:'ショット観覧車', price:5000 },
+];
+
+let customers = [];
+let history = [];
+let nextId = 1;
+let currentReceiptId = null;
+
+onSnapshot(docRef, (docSnap) => {
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    customers = data.customers || [];
+    history   = data.history   || [];
+    nextId    = data.nextId    || 1;
+  } else {
+    customers = []; history = []; nextId = 1;
+    saveState();
+  }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('appContent').style.display = 'block';
+  render();
+}, (error) => {
+  document.getElementById('loading').textContent = '⚠️ 接続エラー：電波状況やFirebaseのルール設定を確認してください';
+  console.error(error);
+});
+
+async function saveState() {
+  await setDoc(docRef, { customers, history, nextId });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+window.addCustomer = function() {
+  const input = document.getElementById('nameInput');
+  const name = input.value.trim();
+  if (!name) return;
+  customers.push({ id: nextId++, name, items: {} });
+  input.value = '';
+  saveState();
+};
+
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') window.addCustomer();
+});
+
+window.deleteCustomer = function(id) {
+  if (!confirm('このお客様の情報を削除しますか？')) return;
+  customers = customers.filter(c => c.id !== id);
+  saveState();
+};
+
+window.changeQty = function(cid, mid, delta) {
+  const c = customers.find(c => c.id === cid);
+  if (!c) return;
+  const cur = c.items[mid] || 0;
+  const next = Math.max(0, cur + delta);
+  if (next === 0) delete c.items[mid];
+  else c.items[mid] = next;
+  saveState();
+};
+
+function calcTotal(customer) {
+  let total = 0;
+  const breakdown = [];
+  for (const [mid, qty] of Object.entries(customer.items)) {
+    if (!qty) continue;
+    const menu = MENU.find(m => m.id === mid);
+    if (!menu) continue;
+    const sub = menu.price * qty;
+    total += sub;
+    breakdown.push({ name: menu.name, qty, price: menu.price, sub });
+  }
+  return { total, breakdown };
+}
+
+window.checkout = function(cid) {
+  const idx = customers.findIndex(c => c.id === cid);
+  if (idx === -1) return;
+  const c = customers[idx];
+  const { total, breakdown } = calcTotal(c);
+  if (total === 0) { alert('注文がありません'); return; }
+  if (!confirm(`${c.name} 様　合計 ¥${total.toLocaleString()} で会計を確定しますか？`)) return;
+  history.unshift({
+    id: Date.now(), name: c.name, breakdown, total,
+    time: new Date().toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+  });
+  customers.splice(idx, 1);
+  saveState();
+};
+
+window.openReceipt = function(cid) {
+  currentReceiptId = cid;
+  render();
+  document.getElementById('modalBg').classList.add('show');
+};
+
+window.closeReceipt = function() {
+  document.getElementById('modalBg').classList.remove('show');
+  currentReceiptId = null;
+};
+
+window.toggleHistory = function() {
+  document.getElementById('historyList').classList.toggle('show');
+};
+
+window.resetAll = function() {
+  if (!confirm('本日の全データ（オープン中・履歴）を消去します。よろしいですか？')) return;
+  customers = []; history = []; nextId = 1;
+  saveState();
+};
+
+function render() {
+  const list  = document.getElementById('customerList');
+  const empty = document.getElementById('emptyMsg');
+  empty.style.display = customers.length === 0 ? 'block' : 'none';
+
+  list.innerHTML = customers.map(c => {
+    const { total } = calcTotal(c);
+    const rows = MENU.map(m => {
+      const qty = c.items[m.id] || 0;
+      return `<div class="menu-row">
+        <span class="menu-name">${m.name}</span>
+        <span class="menu-price">¥${m.price.toLocaleString()}</span>
+        <div class="qty-ctrl">
+          <button onclick="changeQty(${c.id},'${m.id}',-1)">－</button>
+          <span class="qty-num">${qty}</span>
+          <button onclick="changeQty(${c.id},'${m.id}',1)">＋</button>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="card">
+      <div class="card-head">
+        <span class="name">👤 ${escHtml(c.name)}</span>
+        <span class="head-btns">
+          <button class="btn-show" onclick="openReceipt(${c.id})">お客様に見せる</button>
+          <button class="btn-checkout" onclick="checkout(${c.id})">会計確定</button>
+          <button class="btn-del" onclick="deleteCustomer(${c.id})">削除</button>
+        </span>
+      </div>
+      ${rows}
+      <div class="subtotal"><span>小計</span><span class="amt">¥${total.toLocaleString()}</span></div>
+    </div>`;
+  }).join('');
+
+  const hList = document.getElementById('historyList');
+  hList.innerHTML = history.length === 0
+    ? '<div class="empty">まだ会計履歴はありません</div>'
+    : history.map(h => `<div class="history-item">
+        <span>${h.time}　${escHtml(h.name)} 様</span>
+        <span class="h-amt">¥${h.total.toLocaleString()}</span>
+      </div>`).join('');
+
+  const openTotal  = customers.reduce((s, c) => s + calcTotal(c).total, 0);
+  const doneTotal  = history.reduce((s, h) => s + h.total, 0);
+  document.getElementById('openTotal').textContent  = `¥${openTotal.toLocaleString()}`;
+  document.getElementById('doneTotal').textContent  = `¥${doneTotal.toLocaleString()}`;
+  document.getElementById('grandTotal').textContent = `¥${(openTotal + doneTotal).toLocaleString()}`;
+
+  if (currentReceiptId !== null) {
+    const c = customers.find(c => c.id === currentReceiptId);
+    if (c) {
+      const { total, breakdown } = calcTotal(c);
+      document.getElementById('rName').textContent = c.name;
+      document.getElementById('rItems').innerHTML = breakdown.length === 0
+        ? '<div style="text-align:center;color:#888;">注文がありません</div>'
+        : breakdown.map(b => `<div class="r-row"><span>${b.name} ×${b.qty}</span><span>¥${b.sub.toLocaleString()}</span></div>`).join('');
+      document.getElementById('rTotal').textContent = `¥${total.toLocaleString()}`;
+    }
+  }
+}
+</script>
+</body>
+</html>
