@@ -202,10 +202,8 @@ const MENU = [
   { id:'ferris',     name:'ショット観覧車', price:5000 },
 ];
 
-// 画面表示用のラベル（絵文字つき）※CSVラベルとは別管理
 const METHOD_LABEL = { cash:'💴 現金', qr:'📱 QR', credit:'💳 クレカ' };
 const METHOD_CLASS = { cash:'m-cash', qr:'m-qr', credit:'m-credit' };
-// CSV出力専用のラベル（画面表示には影響しません）
 const CSV_METHOD_LABEL = { cash:'現金', qr:'QR決済', credit:'クレジットカード' };
 
 let customers = [];
@@ -329,35 +327,87 @@ window.toggleHistory = function(){
   document.getElementById('historyList').classList.toggle('show');
 };
 
-// ── CSV出力 ──
+// ── CSV出力（お客様別注文明細＋支払い履歴＋集計サマリー） ──
 window.exportCsv = function(){
-  if(history.length===0){
-    alert('まだ支払い履歴がありません');
+  if(customers.length===0 && history.length===0){
+    alert('出力するデータがありません');
     return;
   }
   const BOM = '\uFEFF'; // Excelでの文字化け防止
-  const header = '日時,お客様名,支払い方法,金額(円)\n';
-  const rows = history.slice().reverse().map(h=>{
-    const method = CSV_METHOD_LABEL[h.method] || h.method;
-    const safeName = String(h.name).replace(/"/g,'""');
-    return `"${h.time}","${safeName}","${method}",${h.amount}`;
-  }).join('\n');
+  const lines = [];
 
+  // ①お客様別 注文明細
+  lines.push('【お客様別 注文明細】');
+  lines.push('お客様名,メニュー名,単価(円),数量,小計(円)');
+  customers.forEach(c=>{
+    const safeName = String(c.name).replace(/"/g,'""');
+    const entries = Object.entries(c.items||{}).filter(([,qty])=>qty>0);
+    if(entries.length===0){
+      lines.push(`"${safeName}","(注文なし)",,,`);
+    } else {
+      entries.forEach(([mid, qty])=>{
+        const m = MENU.find(x=>x.id===mid);
+        if(!m) return;
+        const safeMenu = m.name.replace(/"/g,'""');
+        lines.push(`"${safeName}","${safeMenu}",${m.price},${qty},${m.price*qty}`);
+      });
+      const { orderTotal, paidTotal, balance } = calcCustomerData(c);
+      lines.push(`"${safeName} 注文合計",,,,${orderTotal}`);
+      lines.push(`"${safeName} 支払済み",,,,${paidTotal}`);
+      lines.push(`"${safeName} 未払い残高",,,,${balance}`);
+    }
+    lines.push('');
+  });
+
+  // ②支払い履歴
+  lines.push('【支払い履歴】');
+  lines.push('日時,お客様名,支払い方法,金額(円)');
+  if(history.length===0){
+    lines.push('(支払い履歴なし)');
+  } else {
+    history.slice().reverse().forEach(h=>{
+      const method = CSV_METHOD_LABEL[h.method] || h.method;
+      const safeName = String(h.name).replace(/"/g,'""');
+      lines.push(`"${h.time}","${safeName}","${method}",${h.amount}`);
+    });
+  }
+  lines.push('');
+
+  // ③集計サマリー
+  lines.push('【集計サマリー】');
+  lines.push('■ メニュー別 販売集計（全体）');
+  lines.push('メニュー名,単価(円),総販売数,総売上(円)');
+  MENU.forEach(m=>{
+    let totalQty = 0;
+    customers.forEach(c=>{ totalQty += (c.items && c.items[m.id]) || 0; });
+    if(totalQty===0) return; // 1個も売れていないメニューは省略
+    const safeMenu = m.name.replace(/"/g,'""');
+    lines.push(`"${safeMenu}",${m.price},${totalQty},${m.price*totalQty}`);
+  });
+  lines.push('');
+  lines.push('■ 決済方法別集計');
+  lines.push('決済方法,金額(円)');
   const sumCash   = history.filter(h=>h.method==='cash').reduce((s,h)=>s+h.amount,0);
   const sumQr     = history.filter(h=>h.method==='qr').reduce((s,h)=>s+h.amount,0);
   const sumCredit = history.filter(h=>h.method==='credit').reduce((s,h)=>s+h.amount,0);
   const sumTotal  = sumCash+sumQr+sumCredit;
-  const summary = `\n\n集計,,現金,${sumCash}\n集計,,QR決済,${sumQr}\n集計,,クレジット,${sumCredit}\n集計,,総売上,${sumTotal}`;
+  lines.push(`"現金",${sumCash}`);
+  lines.push(`"QR決済",${sumQr}`);
+  lines.push(`"クレジットカード",${sumCredit}`);
+  lines.push(`"総売上（支払済）",${sumTotal}`);
+  let sumBal = 0;
+  customers.forEach(c=>{ sumBal += calcCustomerData(c).balance; });
+  lines.push(`"未払い残高合計",${sumBal}`);
 
-  const blob = new Blob([BOM + header + rows + summary], {type:'text/csv;charset=utf-8;'});
+  const blob = new Blob([BOM + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const now = new Date();
   const y = now.getFullYear();
-  const m = String(now.getMonth()+1).padStart(2,'0');
+  const mo = String(now.getMonth()+1).padStart(2,'0');
   const d = String(now.getDate()).padStart(2,'0');
   a.href = url;
-  a.download = `売上履歴_${y}${m}${d}.csv`;
+  a.download = `売上詳細_${y}${mo}${d}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -368,7 +418,7 @@ window.exportCsv = function(){
 window.resetAll = function(){
   if(!confirm('本日の全データ（お客様・支払い履歴）を消去します。\n※消去前に必要であれば「CSV出力」でバックアップを取ってください。\n\nよろしいですか？')) return;
   const pwd = prompt('確認のため、パスワードを入力してください');
-  if(pwd === null) return; // キャンセル
+  if(pwd === null) return;
   if(pwd !== RESET_PASSWORD){
     alert('パスワードが違います。データは消去されませんでした。');
     return;
@@ -464,8 +514,6 @@ function renderModal(){
       </div>`).join('');
 }
 
-// 検索ボックスの oninput="render()" から呼び出せるよう、
-// render関数を明示的にグローバル(window)へ公開します（今回の修正の核心部分）
 window.render = render;
 </script>
 </body>
