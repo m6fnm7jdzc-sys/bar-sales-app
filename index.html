@@ -18,9 +18,9 @@ h1 { text-align:center; color:#d4af37; font-size:1.25rem; margin-bottom:14px; le
 .summary-box.total .val { color:#d4af37; font-size:1.3rem; }
 
 .add-row { display:flex; gap:8px; margin-bottom:10px; }
-.add-row input, #searchInput { flex:1; padding:10px; border-radius:8px; border:1px solid #d4af37; background:#222; color:#fff; font-size:1rem; }
-#searchInput { margin-bottom:10px; border-color:#555; }
-.btn-gold { background:#d4af37; color:#111; border:none; border-radius:8px; padding:0 16px; font-weight:bold; cursor:pointer; }
+.add-row input { flex:1; padding:10px; border-radius:8px; border:1px solid #d4af37; background:#222; color:#fff; font-size:1rem; }
+#searchInput { width:100%; padding:10px; border-radius:8px; border:1px solid #555; background:#222; color:#fff; font-size:1rem; margin-bottom:10px; }
+.btn-gold { background:#d4af37; color:#111; border:none; border-radius:8px; padding:0 16px; font-weight:bold; cursor:pointer; font-size:1rem; }
 
 .tabs { display:flex; gap:8px; margin-bottom:12px; }
 .tab-btn { flex:1; text-align:center; padding:8px; border-radius:8px; border:1px solid #444; background:#1c1c1c; color:#aaa; font-size:0.85rem; cursor:pointer; }
@@ -34,15 +34,18 @@ h1 { text-align:center; color:#d4af37; font-size:1.25rem; margin-bottom:14px; le
 .c-tile.has-bal .c-bal { color:#ff7675; font-weight:bold; }
 
 .history-toggle { text-align:center; margin:16px 0 8px; }
-.history-toggle button { background:none; border:1px solid #555; color:#aaa; padding:7px 16px; border-radius:20px; font-size:0.8rem; }
+.history-toggle button { background:none; border:1px solid #555; color:#aaa; padding:7px 16px; border-radius:20px; font-size:0.8rem; cursor:pointer; }
 .history-list { display:none; }
 .history-list.show { display:block; }
 .history-item { background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:0.78rem; color:#ccc; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .history-item .h-amt { color:#d4af37; font-weight:bold; margin-left:auto; }
 .h-cancel { background:#a33; color:#fff; border:none; padding:3px 8px; border-radius:5px; font-size:0.7rem; cursor:pointer; }
 
-.footer-actions { text-align:center; margin-top:20px; }
-.footer-actions button { background:none; border:1px solid #a33; color:#e88; padding:8px 14px; border-radius:8px; font-size:0.8rem; }
+.footer-actions { display:flex; flex-direction:column; gap:10px; align-items:stretch; margin-top:20px; }
+.footer-actions button { padding:11px 0; border-radius:8px; font-size:0.85rem; cursor:pointer; font-weight:bold; }
+.btn-csv { background:none; border:1px solid #2e8b57; color:#a5d6a7; }
+.btn-reset { background:none; border:1px solid #a33; color:#e88; }
+
 .empty { text-align:center; color:#555; padding:24px 0; }
 
 .m-cash { color:#a5d6a7; }
@@ -60,7 +63,7 @@ h1 { text-align:center; color:#d4af37; font-size:1.25rem; margin-bottom:14px; le
 .menu-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #333; font-size:0.85rem; }
 .menu-name { flex:1; color:#ddd; padding-right:8px; }
 .qty-ctrl { display:flex; align-items:center; gap:8px; }
-.qty-ctrl button { width:30px; height:30px; border-radius:50%; border:1px solid #d4af37; background:transparent; color:#d4af37; font-size:1.1rem; }
+.qty-ctrl button { width:30px; height:30px; border-radius:50%; border:1px solid #d4af37; background:transparent; color:#d4af37; font-size:1.1rem; cursor:pointer; }
 .qty-num { width:22px; text-align:center; font-weight:bold; }
 
 .calc-area { background:#111; border-radius:8px; padding:12px; margin:16px 0; }
@@ -124,7 +127,8 @@ h1 { text-align:center; color:#d4af37; font-size:1.25rem; margin-bottom:14px; le
   <div class="history-list" id="historyList"></div>
 
   <div class="footer-actions">
-    <button onclick="resetAll()">🗑 本日の営業終了（全データリセット）</button>
+    <button class="btn-csv" onclick="exportCsv()">📄 本日の売上をCSV出力</button>
+    <button class="btn-reset" onclick="resetAll()">🗑 本日の営業終了（全データリセット）</button>
   </div>
 </div>
 
@@ -182,6 +186,8 @@ const firebaseConfig = {
   measurementId: "G-6GK5NBBLKD"
 };
 
+const RESET_PASSWORD = "19911003";
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const docRef = doc(db, "bar_data", "main_state");
@@ -196,8 +202,11 @@ const MENU = [
   { id:'ferris',     name:'ショット観覧車', price:5000 },
 ];
 
+// 画面表示用のラベル（絵文字つき）※CSVラベルとは別管理
 const METHOD_LABEL = { cash:'💴 現金', qr:'📱 QR', credit:'💳 クレカ' };
 const METHOD_CLASS = { cash:'m-cash', qr:'m-qr', credit:'m-credit' };
+// CSV出力専用のラベル（画面表示には影響しません）
+const CSV_METHOD_LABEL = { cash:'現金', qr:'QR決済', credit:'クレジットカード' };
 
 let customers = [];
 let history = [];
@@ -319,50 +328,56 @@ window.switchTab = function(tab){
 window.toggleHistory = function(){
   document.getElementById('historyList').classList.toggle('show');
 };
-window.resetAll = function(){
-  if(!confirm('本日の全データ（お客様・支払い履歴）を消去します。よろしいですか？')) return;
-  customers = []; history = []; nextId = 1;
-  saveState();
+
+// ── CSV出力 ──
+window.exportCsv = function(){
+  if(history.length===0){
+    alert('まだ支払い履歴がありません');
+    return;
+  }
+  const BOM = '\uFEFF'; // Excelでの文字化け防止
+  const header = '日時,お客様名,支払い方法,金額(円)\n';
+  const rows = history.slice().reverse().map(h=>{
+    const method = CSV_METHOD_LABEL[h.method] || h.method;
+    const safeName = String(h.name).replace(/"/g,'""');
+    return `"${h.time}","${safeName}","${method}",${h.amount}`;
+  }).join('\n');
+
+  const sumCash   = history.filter(h=>h.method==='cash').reduce((s,h)=>s+h.amount,0);
+  const sumQr     = history.filter(h=>h.method==='qr').reduce((s,h)=>s+h.amount,0);
+  const sumCredit = history.filter(h=>h.method==='credit').reduce((s,h)=>s+h.amount,0);
+  const sumTotal  = sumCash+sumQr+sumCredit;
+  const summary = `\n\n集計,,現金,${sumCash}\n集計,,QR決済,${sumQr}\n集計,,クレジット,${sumCredit}\n集計,,総売上,${sumTotal}`;
+
+  const blob = new Blob([BOM + header + rows + summary], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  a.href = url;
+  a.download = `売上履歴_${y}${m}${d}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
-function renderModal(){
-  if(currentCid===null) return;
-  const c = customers.find(x=>x.id===currentCid);
-  if(!c){ closeModal(); return; }
-
-  document.getElementById('mTitle').textContent = `👤 ${c.name} 様`;
-  document.getElementById('mStatusLabel').textContent = c.checkedOut ? '✅ 会計済み（退店済）' : '🟡 接客中';
-  document.getElementById('mToggleBtn').textContent = c.checkedOut ? '接客中に戻す' : '退店（会計済みにする）';
-
-  const rows = MENU.map(m=>{
-    const qty = (c.items && c.items[m.id]) || 0;
-    return `<div class="menu-row">
-      <span class="menu-name">${m.name}<br><small style="color:#d4af37">¥${m.price.toLocaleString()}</small></span>
-      <div class="qty-ctrl">
-        <button onclick="changeQty('${m.id}',-1)">－</button>
-        <span class="qty-num">${qty}</span>
-        <button onclick="changeQty('${m.id}',1)">＋</button>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('mMenuItems').innerHTML = rows;
-
-  const data = calcCustomerData(c);
-  document.getElementById('mOrderTotal').textContent = `¥${data.orderTotal.toLocaleString()}`;
-  document.getElementById('mPaidTotal').textContent  = `¥${data.paidTotal.toLocaleString()}`;
-  document.getElementById('mBalance').textContent    = `¥${data.balance.toLocaleString()}`;
-  document.getElementById('payAmount').value = data.balance>0 ? data.balance : '';
-
-  const myHist = history.filter(h=>h.cid===c.id);
-  document.getElementById('mHistoryList').innerHTML = myHist.length===0
-    ? '<div style="color:#666;font-size:0.8rem;padding:6px 0;">まだ支払い記録はありません</div>'
-    : myHist.map(h=>`<div class="m-hist-item">
-        <span>${h.time}</span>
-        <span class="${METHOD_CLASS[h.method]}">${METHOD_LABEL[h.method]}</span>
-        <span class="m-hist-amt">¥${h.amount.toLocaleString()}</span>
-        <button class="m-hist-cancel" onclick="cancelPayment(${h.id})">取消</button>
-      </div>`).join('');
-}
+// ── パスワード保護つきリセット ──
+window.resetAll = function(){
+  if(!confirm('本日の全データ（お客様・支払い履歴）を消去します。\n※消去前に必要であれば「CSV出力」でバックアップを取ってください。\n\nよろしいですか？')) return;
+  const pwd = prompt('確認のため、パスワードを入力してください');
+  if(pwd === null) return; // キャンセル
+  if(pwd !== RESET_PASSWORD){
+    alert('パスワードが違います。データは消去されませんでした。');
+    return;
+  }
+  customers = []; history = []; nextId = 1;
+  saveState();
+  render();
+  alert('本日のデータをリセットしました。');
+};
 
 function render(){
   const sumCash = history.filter(h=>h.method==='cash').reduce((s,h)=>s+h.amount,0);
@@ -409,6 +424,49 @@ function render(){
 
   if(currentCid!==null) renderModal();
 }
+
+function renderModal(){
+  if(currentCid===null) return;
+  const c = customers.find(x=>x.id===currentCid);
+  if(!c){ window.closeModal(); return; }
+
+  document.getElementById('mTitle').textContent = `👤 ${c.name} 様`;
+  document.getElementById('mStatusLabel').textContent = c.checkedOut ? '✅ 会計済み（退店済）' : '🟡 接客中';
+  document.getElementById('mToggleBtn').textContent = c.checkedOut ? '接客中に戻す' : '退店（会計済みにする）';
+
+  const rows = MENU.map(m=>{
+    const qty = (c.items && c.items[m.id]) || 0;
+    return `<div class="menu-row">
+      <span class="menu-name">${m.name}<br><small style="color:#d4af37">¥${m.price.toLocaleString()}</small></span>
+      <div class="qty-ctrl">
+        <button onclick="changeQty('${m.id}',-1)">－</button>
+        <span class="qty-num">${qty}</span>
+        <button onclick="changeQty('${m.id}',1)">＋</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('mMenuItems').innerHTML = rows;
+
+  const data = calcCustomerData(c);
+  document.getElementById('mOrderTotal').textContent = `¥${data.orderTotal.toLocaleString()}`;
+  document.getElementById('mPaidTotal').textContent  = `¥${data.paidTotal.toLocaleString()}`;
+  document.getElementById('mBalance').textContent    = `¥${data.balance.toLocaleString()}`;
+  document.getElementById('payAmount').value = data.balance>0 ? data.balance : '';
+
+  const myHist = history.filter(h=>h.cid===c.id);
+  document.getElementById('mHistoryList').innerHTML = myHist.length===0
+    ? '<div style="color:#666;font-size:0.8rem;padding:6px 0;">まだ支払い記録はありません</div>'
+    : myHist.map(h=>`<div class="m-hist-item">
+        <span>${h.time}</span>
+        <span class="${METHOD_CLASS[h.method]}">${METHOD_LABEL[h.method]}</span>
+        <span class="m-hist-amt">¥${h.amount.toLocaleString()}</span>
+        <button class="m-hist-cancel" onclick="cancelPayment(${h.id})">取消</button>
+      </div>`).join('');
+}
+
+// 検索ボックスの oninput="render()" から呼び出せるよう、
+// render関数を明示的にグローバル(window)へ公開します（今回の修正の核心部分）
+window.render = render;
 </script>
 </body>
 </html>
