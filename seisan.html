@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>精算計算ツール</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; background:#111; color:#fff; padding:16px; padding-bottom:80px; font-size:0.95rem; }
+h1 { text-align:center; color:#d4af37; font-size:1.2rem; margin-bottom:6px; }
+.subtitle { text-align:center; color:#888; font-size:0.75rem; margin-bottom:20px; }
+.section { background:#1c1c1c; border:1px solid #333; border-radius:12px; padding:16px; margin-bottom:16px; }
+.section-title { font-size:0.85rem; font-weight:bold; color:#d4af37; margin-bottom:12px; letter-spacing:1px; border-bottom:1px solid #333; padding-bottom:8px; }
+.csv-drop { border:2px dashed #555; border-radius:10px; padding:20px; text-align:center; color:#888; margin-bottom:10px; cursor:pointer; transition:border-color .2s; }
+.csv-drop:hover, .csv-drop.over { border-color:#d4af37; color:#d4af37; }
+.csv-drop input { display:none; }
+.csv-loaded { font-size:0.8rem; color:#8bc48b; margin-top:6px; text-align:center; }
+.input-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.input-row label { min-width:200px; color:#ccc; font-size:0.85rem; flex-shrink:0; }
+.input-row input[type="number"] { flex:1; min-width:120px; padding:8px 10px; border-radius:8px; border:1px solid #555; background:#111; color:#fff; font-size:1rem; text-align:right; }
+.input-row input[type="number"]:focus { border-color:#d4af37; outline:none; }
+.auto-badge { font-size:0.7rem; background:#2e8b57; color:#fff; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.manual-badge { font-size:0.7rem; background:#555; color:#fff; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.ratio-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.ratio-item label { display:block; font-size:0.75rem; color:#aaa; margin-bottom:4px; }
+.ratio-item input { width:100%; padding:8px; border-radius:8px; border:1px solid #555; background:#111; color:#fff; font-size:0.95rem; text-align:center; }
+.ratio-item input:focus { border-color:#d4af37; outline:none; }
+.ratio-sum { font-size:0.75rem; margin-top:6px; text-align:right; }
+.ratio-ok { color:#8bc48b; }
+.ratio-ng { color:#ff7675; }
+.champ-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.champ-table th { color:#aaa; padding:6px 8px; border-bottom:1px solid #333; text-align:left; }
+.champ-table td { padding:6px 8px; border-bottom:1px solid #222; vertical-align:middle; }
+.champ-table tr.flagged { background:#2a1c00; }
+.champ-table input[type="checkbox"] { width:18px; height:18px; cursor:pointer; accent-color:#d4af37; }
+.champ-total { text-align:right; font-weight:bold; color:#d4af37; padding:8px; font-size:0.9rem; }
+.no-order { color:#555; text-align:center; padding:12px; }
+.calc-btn { width:100%; padding:14px; background:#d4af37; color:#111; font-weight:bold; font-size:1rem; border:none; border-radius:10px; cursor:pointer; margin-bottom:16px; letter-spacing:1px; }
+.calc-btn:active { opacity:0.85; }
+.result-section { background:#1c1c1c; border-radius:12px; padding:16px; margin-bottom:12px; }
+.result-title { font-size:0.88rem; font-weight:bold; color:#d4af37; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #333; }
+.result-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #1a1a1a; font-size:0.88rem; }
+.result-row:last-child { border-bottom:none; }
+.result-label { color:#aaa; flex:1; }
+.result-label.sub { color:#666; font-size:0.78rem; padding-left:12px; }
+.result-val { font-weight:bold; color:#fff; text-align:right; min-width:100px; }
+.result-val.highlight { color:#d4af37; font-size:1.05rem; }
+.result-val.positive { color:#8bc48b; }
+.result-val.negative { color:#ff7675; }
+.check-ok { background:#1a3a1a; border:1px solid #2e8b57; border-radius:10px; padding:14px; text-align:center; color:#8bc48b; font-weight:bold; font-size:0.95rem; margin-bottom:12px; }
+.check-ng { background:#3a1a1a; border:1px solid #e74c3c; border-radius:10px; padding:14px; text-align:center; color:#ff7675; font-weight:bold; font-size:0.95rem; margin-bottom:12px; }
+.export-btn { width:100%; padding:12px; background:none; border:1px solid #2e8b57; color:#a5d6a7; font-weight:bold; font-size:0.9rem; border-radius:10px; cursor:pointer; margin-bottom:10px; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<h1>💰 精算計算ツール</h1>
+<p class="subtitle">営業終了後にCSVを読み込んで精算額を自動計算します</p>
+
+<div class="section">
+  <div class="section-title">① CSVファイルを読み込む（売上管理アプリから出力したもの）</div>
+  <div class="csv-drop" id="csvDrop" onclick="document.getElementById('csvFile').click()">
+    📄 ここをタップしてCSVファイルを選択<br>
+    <small>（売上管理アプリの「本日の売上をCSV出力」で出力したファイル）</small>
+    <input type="file" id="csvFile" accept=".csv">
+  </div>
+  <div class="csv-loaded hidden" id="csvLoaded"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">② 変数の確認・手動入力</div>
+  <div class="input-row">
+    <label>A：総売上（支払済）</label>
+    <span class="auto-badge">CSV自動</span>
+    <input type="number" id="varA" placeholder="0" min="0" oninput="onInputChange()">
+  </div>
+  <div class="input-row">
+    <label>C：クレジットカード決済合計</label>
+    <span class="auto-badge">CSV自動</span>
+    <input type="number" id="varC" placeholder="0" min="0" oninput="onInputChange()">
+  </div>
+  <div class="input-row">
+    <label>B：シャンパン代総額</label>
+    <span class="auto-badge">下表で自動集計</span>
+    <input type="number" id="varB" placeholder="0" min="0" readonly style="background:#0a0a0a;color:#d4af37;">
+  </div>
+  <div class="input-row">
+    <label>E：シャンパン代のうち未収金額</label>
+    <span class="manual-badge">手動入力</span>
+    <input type="number" id="varE" placeholder="0" min="0" oninput="onInputChange()">
+  </div>
+  <div class="input-row">
+    <label>D：チップ（特定人物へ全額渡す）</label>
+    <span class="manual-badge">手動入力</span>
+    <input type="number" id="varD" placeholder="0" min="0" oninput="onInputChange()">
+  </div>
+  <div class="input-row">
+    <label>F：オーナーへ既に送金済みの金額</label>
+    <span class="manual-badge">手動入力（任意）</span>
+    <input type="number" id="varF" placeholder="未入力の場合は空欄" min="0" oninput="onInputChange()">
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">③ シャンパン対象行にチェックを入れてください（B を確定）</div>
+  <div id="champTableWrap">
+    <div class="no-order">CSVを読み込むと注文一覧が表示されます</div>
+  </div>
+  <div class="champ-total">B（シャンパン代総額）＝ <span id="bTotal">¥0</span></div>
+</div>
+
+<div class="section">
+  <div class="section-title">④ 比率設定（変更可能・この端末に自動保存されます）</div>
+  <div class="ratio-grid">
+    <div class="ratio-item">
+      <label>シャンパン担当者の取り分</label>
+      <input type="number" id="rChampNoguchi" value="0.8" step="0.01" min="0" max="1" oninput="checkRatioSum('champ')">
+    </div>
+    <div class="ratio-item">
+      <label>シャンパン オーナーの取り分</label>
+      <input type="number" id="rChampOwner" value="0.2" step="0.01" min="0" max="1" oninput="checkRatioSum('champ')">
+    </div>
+    <div class="ratio-item">
+      <label>店舗実質売上 オーナー取り分</label>
+      <input type="number" id="rStoreOwner" value="0.5" step="0.01" min="0" max="1" oninput="checkRatioSum('store')">
+    </div>
+    <div class="ratio-item">
+      <label>店舗実質売上 報酬プール取り分</label>
+      <input type="number" id="rStorePool" value="0.5" step="0.01" min="0" max="1" oninput="checkRatioSum('store')">
+    </div>
+    <div class="ratio-item">
+      <label>プール 自分の取り分</label>
+      <input type="number" id="rPoolSelf" value="0.5" step="0.01" min="0" max="1" oninput="checkRatioSum('pool')">
+    </div>
+    <div class="ratio-item">
+      <label>プール 担当スタッフ取り分</label>
+      <input type="number" id="rPoolStaff" value="0.5" step="0.01" min="0" max="1" oninput="checkRatioSum('pool')">
+    </div>
+  </div>
+  <div id="ratioSumMsg" class="ratio-sum"></div>
+</div>
+
+<button class="calc-btn" onclick="calculate()">🧮 精算額を計算する</button>
+
+<div id="resultArea" class="hidden">
+  <div id="checkResult"></div>
+
+  <div class="result-section">
+    <div class="result-title">👑 オーナーへ渡す分</div>
+    <div class="result-row">
+      <span class="result-label">⑩ 理論合計</span>
+      <span class="result-val highlight" id="r10"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label sub">うち ③ 店舗取り分</span>
+      <span class="result-val" id="r03"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label sub">うち ⑤ シャンパン取り分（理論値）</span>
+      <span class="result-val" id="r05"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">C：クレジット決済分（端末経由で既入金）</span>
+      <span class="result-val" id="rC"></span>
+    </div>
+    <div class="result-row" style="background:#2a2411;border-radius:6px;padding:6px 4px;margin-top:4px;">
+      <span class="result-label" style="color:#d4af37;font-weight:bold;">⑪ 本日 現金で手渡しする金額</span>
+      <span class="result-val highlight" id="r11"></span>
+    </div>
+    <div class="result-row hidden" id="rowF">
+      <span class="result-label">F：送金済み額との過不足</span>
+      <span class="result-val" id="rFdiff"></span>
+    </div>
+  </div>
+
+  <div class="result-section">
+    <div class="result-title">🍾 担当者（シャンパン担当）へ渡す分</div>
+    <div class="result-row" style="background:#2a2411;border-radius:6px;padding:6px 4px;margin-bottom:4px;">
+      <span class="result-label" style="color:#d4af37;font-weight:bold;">⑫ 本日渡す合計</span>
+      <span class="result-val highlight" id="r12"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label sub">うち ⑦ シャンパン分（本日渡し）</span>
+      <span class="result-val" id="r07"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label sub">うち D：チップ</span>
+      <span class="result-val" id="rD"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label sub">うち ⑨ プール取り分</span>
+      <span class="result-val" id="r09"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">E：未収金（後日担当者が直接回収）</span>
+      <span class="result-val" id="rE"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">⑬ 最終合計（E回収後）</span>
+      <span class="result-val positive" id="r13"></span>
+    </div>
+  </div>
+
+  <div class="result-section">
+    <div class="result-title">💼 報酬プール</div>
+    <div class="result-row">
+      <span class="result-label">④ プール合計</span>
+      <span class="result-val" id="r04"></span>
+    </div>
+    <div class="result-row" style="background:#2a2411;border-radius:6px;padding:6px 4px;margin-top:4px;">
+      <span class="result-label" style="color:#d4af37;font-weight:bold;">⑧ 自分の取り分</span>
+      <span class="result-val highlight" id="r08"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">⑨ 担当スタッフの取り分</span>
+      <span class="result-val" id="r09b"></span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" style="cursor:pointer;" onclick="toggleSteps()">
+      📋 計算過程の詳細（タップで展開）
+    </div>
+    <div id="stepsDetail" class="hidden">
+      <div id="stepsContent" style="font-size:0.82rem;line-height:2;color:#bbb;"></div>
+    </div>
+  </div>
+
+  <button class="export-btn" onclick="exportResultCsv()">📄 精算結果をCSV出力</button>
+</div>
+
+<script>
+let orderRows = [];
+let champFlags = {};
+let lastResult = null;
+
+document.getElementById('csvFile').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(file) readCsv(file);
+});
+const drop = document.getElementById('csvDrop');
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', ()=>{ drop.classList.remove('over'); });
+drop.addEventListener('drop', e=>{
+  e.preventDefault(); drop.classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if(file) readCsv(file);
+});
+
+function readCsv(file){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result.replace(/^\uFEFF/,'');
+    parseCsv(text, file.name);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCsv(text, filename){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+  let totalSales = 0, totalCredit = 0;
+  let inSummary = false, inPayMethod = false, inOrderDetail = false;
+  orderRows = []; champFlags = {};
+
+  for(let i=0; i<lines.length; i++){
+    const line = lines[i];
+    if(line.includes('【集計サマリー】')) { inSummary=true; continue; }
+    if(line.includes('【お客様別 注文・支払い明細】')) { inSummary=false; inOrderDetail=true; continue; }
+    if(line.includes('【支払い履歴')) { inOrderDetail=false; continue; }
+    if(inSummary && line.includes('■ 決済方法別集計')) { inPayMethod=true; continue; }
+    if(inSummary && inPayMethod){
+      const cols = parseCsvLine(line);
+      if(cols[0]==='総売上（支払済）' && cols[1]) totalSales = parseInt(cols[1].replace(/[^\d]/g,''))||0;
+      if(cols[0]==='クレジットカード' && cols[1]) totalCredit = parseInt(cols[1].replace(/[^\d]/g,''))||0;
+    }
+    if(inOrderDetail){
+      const cols = parseCsvLine(line);
+      if(cols.length>=6 && cols[1]==='[注文]'){
+        const price = parseInt(cols[3])||0;
+        const qty   = parseInt(cols[4])||0;
+        const sub   = parseInt(cols[5])||0;
+        orderRows.push({ customerName: cols[0]||'', menuName: cols[2]||'', price, qty, sub });
+      }
+    }
+  }
+
+  document.getElementById('varA').value = totalSales;
+  document.getElementById('varC').value = totalCredit;
+  document.getElementById('csvLoaded').textContent = `✅ 読み込み完了：${filename}（総売上 ¥${totalSales.toLocaleString()}、クレジット ¥${totalCredit.toLocaleString()}）`;
+  document.getElementById('csvLoaded').classList.remove('hidden');
+  buildChampTable();
+  onInputChange();
+}
+
+function parseCsvLine(line){
+  const result = [];
+  let cur = '', inQ = false;
+  for(let i=0; i<line.length; i++){
+    const ch = line[i];
+    if(ch==='"'){
+      if(inQ && line[i+1]==='"'){ cur+='"'; i++; }
+      else inQ = !inQ;
+    } else if(ch===',' && !inQ){
+      result.push(cur.trim()); cur='';
+    } else { cur+=ch; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function buildChampTable(){
+  const wrap = document.getElementById('champTableWrap');
+  if(orderRows.length===0){
+    wrap.innerHTML='<div class="no-order">注文明細が見つかりませんでした</div>';
+    return;
+  }
+  let html = `<table class="champ-table">
+    <thead><tr>
+      <th>シャン<br>対象</th><th>お客様名</th><th>メニュー</th><th>数量</th><th>金額</th>
+    </tr></thead><tbody>`;
+  orderRows.forEach((row, i)=>{
+    const checked = champFlags[i] ? 'checked' : '';
+    const cls = champFlags[i] ? 'flagged' : '';
+    html += `<tr class="${cls}" id="champRow${i}">
+      <td style="text-align:center;"><input type="checkbox" ${checked} onchange="toggleChampFlag(${i},this.checked)"></td>
+      <td>${escHtml(row.customerName)}</td>
+      <td>${escHtml(row.menuName)}</td>
+      <td style="text-align:right;">${row.qty}</td>
+      <td style="text-align:right;">¥${row.sub.toLocaleString()}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  orderRows.forEach((row, i)=>{
+    if(row.menuName.includes('オリシャン') || row.menuName.includes('シャンパン')){
+      champFlags[i] = true;
+    }
+  });
+  refreshChampTable();
+}
+
+function toggleChampFlag(i, val){
+  champFlags[i] = val;
+  const row = document.getElementById('champRow'+i);
+  if(row) row.className = val ? 'flagged':'';
+  updateBTotal();
+  onInputChange();
+}
+
+function refreshChampTable(){
+  orderRows.forEach((row, i)=>{
+    const cb = document.querySelector(`#champRow${i} input[type=checkbox]`);
+    if(cb) cb.checked = !!champFlags[i];
+    const tr = document.getElementById('champRow'+i);
+    if(tr) tr.className = champFlags[i] ? 'flagged':'';
+  });
+  updateBTotal();
+}
+
+function updateBTotal(){
+  let b = 0;
+  orderRows.forEach((row,i)=>{ if(champFlags[i]) b += row.sub; });
+  document.getElementById('varB').value = b;
+  document.getElementById('bTotal').textContent = '¥'+b.toLocaleString();
+  onInputChange();
+}
+
+// ── 比率チェック ──
+function checkRatioSum(group){
+  let a=0, b=0;
+  if(group==='champ'){
+    a = parseFloat(document.getElementById('rChampNoguchi').value)||0;
+    b = parseFloat(document.getElementById('rChampOwner').value)||0;
+  } else if(group==='store'){
+    a = parseFloat(document.getElementById('rStoreOwner').value)||0;
+    b = parseFloat(document.getElementById('rStorePool').value)||0;
+  } else {
+    a = parseFloat(document.getElementById('rPoolSelf').value)||0;
+    b = parseFloat(document.getElementById('rPoolStaff').value)||0;
+  }
+  const sum = Math.round((a+b)*100)/100;
+  const msg = document.getElementById('ratioSumMsg');
+  const labels = {champ:'シャンパン比率', store:'店舗比率', pool:'プール比率'};
+  if(Math.abs(sum-1)>0.001){
+    msg.innerHTML = `<span class="ratio-ng">⚠️ ${labels[group]}の合計が ${sum} です（合計が1.0になるよう設定してください。検算が正しく機能しません）</span>`;
+  } else {
+    msg.innerHTML = `<span class="ratio-ok">✅ 比率の合計は正常です</span>`;
+  }
+  saveRatiosToStorage();
+}
+
+function onInputChange(){
+  checkRatioSum('champ'); checkRatioSum('store'); checkRatioSum('pool');
+}
+
+window.toggleSteps = function(){
+  document.getElementById('stepsDetail').classList.toggle('hidden');
+};
+
+// ── 比率設定の永続化（この端末のブラウザ内に保存） ──
+const RATIO_IDS = ['rChampNoguchi','rChampOwner','rStoreOwner','rStorePool','rPoolSelf','rPoolStaff'];
+function saveRatiosToStorage(){
+  const data = {};
+  RATIO_IDS.forEach(id=>{ data[id] = document.getElementById(id).value; });
+  localStorage.setItem('seisanRatios', JSON.stringify(data));
+}
+function loadRatiosFromStorage(){
+  try{
+    const raw = localStorage.getItem('seisanRatios');
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    RATIO_IDS.forEach(id=>{
+      if(data[id] !== undefined && document.getElementById(id)){
+        document.getElementById(id).value = data[id];
+      }
+    });
+  }catch(e){ console.warn('比率の読み込みに失敗しました', e); }
+}
+
+// ── メイン計算 ──
+window.calculate = function(){
+  const A = parseFloat(document.getElementById('varA').value)||0;
+  const B = parseFloat(document.getElementById('varB').value)||0;
+  const C = parseFloat(document.getElementById('varC').value)||0;
+  const D = parseFloat(document.getElementById('varD').value)||0;
+  const E = parseFloat(document.getElementById('varE').value)||0;
+  const F = document.getElementById('varF').value;
+  const hasF = F !== '' && F !== null;
+  const Fval = hasF ? parseFloat(F)||0 : 0;
+
+  const rChampNoguchi = parseFloat(document.getElementById('rChampNoguchi').value)||0;
+  const rChampOwner   = parseFloat(document.getElementById('rChampOwner').value)||0;
+  const rStoreOwner   = parseFloat(document.getElementById('rStoreOwner').value)||0;
+  const rStorePool    = parseFloat(document.getElementById('rStorePool').value)||0;
+  const rPoolSelf     = parseFloat(document.getElementById('rPoolSelf').value)||0;
+  const rPoolStaff    = parseFloat(document.getElementById('rPoolStaff').value)||0;
+
+  const collectedChamp = B - E;
+  const N = A - D - collectedChamp;
+
+  const r03 = N * rStoreOwner;
+  const r04 = N * rStorePool;
+  const r05 = B * rChampOwner;
+  const r06 = B * rChampNoguchi;
+  const r07 = collectedChamp - r05;
+  const r08 = r04 * rPoolSelf;
+  const r09 = r04 * rPoolStaff;
+  const r10 = r03 + r05;
+  const r11 = r10 - C;
+  const r12 = r07 + D + r09;
+  const r13 = r12 + E;
+
+  const checkSum = r10 + r12 + r08;
+  const diff = Math.round((checkSum - A) * 100) / 100;
+  const checkOk = Math.abs(diff) < 1;
+  const Fdiff = hasF ? Fval - r11 : null;
+
+  lastResult = { A,B,C,D,E,F:Fval,hasF,N,collectedChamp,r03,r04,r05,r06,r07,r08,r09,r10,r11,r12,r13,checkOk,diff,Fdiff,
+    rChampNoguchi,rChampOwner,rStoreOwner,rStorePool,rPoolSelf,rPoolStaff };
+
+  const fmt = (v) => `¥${Math.round(v).toLocaleString()}`;
+
+  document.getElementById('r03').textContent = fmt(r03);
+  document.getElementById('r04').textContent = fmt(r04);
+  document.getElementById('r05').textContent = fmt(r05);
+  document.getElementById('r07').textContent = fmt(r07);
+  document.getElementById('r08').textContent = fmt(r08);
+  document.getElementById('r09').textContent = fmt(r09);
+  document.getElementById('r09b').textContent = fmt(r09);
+  document.getElementById('r10').textContent = fmt(r10);
+  document.getElementById('r11').textContent = fmt(r11);
+  document.getElementById('r12').textContent = fmt(r12);
+  document.getElementById('r13').textContent = fmt(r13);
+  document.getElementById('rC').textContent  = fmt(C);
+  document.getElementById('rD').textContent  = fmt(D);
+  document.getElementById('rE').textContent  = fmt(E);
+
+  const rowF = document.getElementById('rowF');
+  if(hasF && Fdiff !== null){
+    rowF.classList.remove('hidden');
+    const el = document.getElementById('rFdiff');
+    if(Fdiff > 0){
+      el.textContent = `+${fmt(Fdiff)}（${fmt(Fdiff)} 渡しすぎ）`;
+      el.className = 'result-val negative';
+    } else if(Fdiff < 0){
+      el.textContent = `${fmt(Fdiff)}（${fmt(Math.abs(Fdiff))} 渡し足りない）`;
+      el.className = 'result-val positive';
+    } else {
+      el.textContent = '過不足なし ✅';
+      el.className = 'result-val positive';
+    }
+  } else {
+    rowF.classList.add('hidden');
+  }
+
+  const checkEl = document.getElementById('checkResult');
+  if(checkOk){
+    checkEl.innerHTML = `<div class="check-ok">✅ 検算OK：A（総売上 ${fmt(A)}）＝ オーナー理論合計 + 担当者本日渡し + 自分の取り分（合計 ${fmt(checkSum)}）</div>`;
+  } else {
+    checkEl.innerHTML = `<div class="check-ng">⚠️ 検算NG：A（${fmt(A)}）と各取り分合計（${fmt(checkSum)}）に ¥${Math.abs(Math.round(diff)).toLocaleString()} のズレがあります。まず④の比率ペアの合計が1.0になっているか、次にB・E・Dの入力値を確認してください。</div>`;
+  }
+
+  document.getElementById('stepsContent').innerHTML = [
+    `A（総売上）= ${fmt(A)}`,
+    `B（シャンパン代総額）= ${fmt(B)}`,
+    `C（クレジット合計）= ${fmt(C)}`,
+    `D（チップ）= ${fmt(D)}`,
+    `E（シャンパン未収）= ${fmt(E)}`,
+    ``,
+    `① 回収済みシャンパン代 = B - E = ${fmt(B)} - ${fmt(E)} = ${fmt(collectedChamp)}`,
+    `② 店舗実質売上 N = A - D - ① = ${fmt(A)} - ${fmt(D)} - ${fmt(collectedChamp)} = ${fmt(N)}`,
+    ``,
+    `③ オーナー店舗取り分 = N × ${rStoreOwner} = ${fmt(r03)}`,
+    `④ 報酬プール = N × ${rStorePool} = ${fmt(r04)}`,
+    ``,
+    `⑤ オーナーのシャンパン取り分（理論値） = B × ${rChampOwner} = ${fmt(r05)}`,
+    `⑥ 担当者のシャンパン取り分（理論値） = B × ${rChampNoguchi} = ${fmt(r06)}`,
+    `⑦ 担当者へ本日渡すシャンパン分 = ① - ⑤ = ${fmt(collectedChamp)} - ${fmt(r05)} = ${fmt(r07)}`,
+    ``,
+    `⑧ 自分の取り分 = ④ × ${rPoolSelf} = ${fmt(r08)}`,
+    `⑨ 担当スタッフのプール取り分 = ④ × ${rPoolStaff} = ${fmt(r09)}`,
+    ``,
+    `⑩ オーナー理論合計 = ③ + ⑤ = ${fmt(r03)} + ${fmt(r05)} = ${fmt(r10)}`,
+    `⑪ オーナーへの本日手渡し額 = ⑩ - C = ${fmt(r10)} - ${fmt(C)} = ${fmt(r11)}`,
+    `⑫ 担当者への本日渡す合計 = ⑦ + D + ⑨ = ${fmt(r07)} + ${fmt(D)} + ${fmt(r09)} = ${fmt(r12)}`,
+    `⑬ 担当者の最終合計（E回収後） = ⑫ + E = ${fmt(r12)} + ${fmt(E)} = ${fmt(r13)}`,
+    ``,
+    `検算：⑩ + ⑫ + ⑧ = ${fmt(r10)} + ${fmt(r12)} + ${fmt(r08)} = ${fmt(checkSum)}`,
+    `A = ${fmt(A)}　→　${checkOk ? '✅ 一致':'⚠️ 不一致（差額：¥'+Math.abs(Math.round(diff)).toLocaleString()+'）'}`,
+  ].map(l => l==='' ? '<br>' : `<div>${l}</div>`).join('');
+
+  document.getElementById('resultArea').classList.remove('hidden');
+  document.getElementById('resultArea').scrollIntoView({behavior:'smooth'});
+};
+
+window.exportResultCsv = function(){
+  if(!lastResult){ alert('先に計算してください'); return; }
+  const r = lastResult;
+  const BOM = '\uFEFF';
+  const fmt = (v) => Math.round(v);
+  const lines = [];
+  lines.push('【精算計算結果】');
+  lines.push(`計算日時,"${new Date().toLocaleString('ja-JP')}"`);
+  lines.push('');
+  lines.push('■ 入力値');
+  lines.push(`A（総売上）,${fmt(r.A)}`);
+  lines.push(`B（シャンパン代総額）,${fmt(r.B)}`);
+  lines.push(`C（クレジット合計）,${fmt(r.C)}`);
+  lines.push(`D（チップ）,${fmt(r.D)}`);
+  lines.push(`E（シャンパン未収）,${fmt(r.E)}`);
+  if(r.hasF) lines.push(`F（送金済み額）,${fmt(r.F)}`);
+  lines.push('');
+  lines.push('■ 比率設定');
+  lines.push(`シャンパン担当者取り分比率,${r.rChampNoguchi}`);
+  lines.push(`シャンパンオーナー取り分比率,${r.rChampOwner}`);
+  lines.push(`店舗実質売上オーナー比率,${r.rStoreOwner}`);
+  lines.push(`店舗実質売上プール比率,${r.rStorePool}`);
+  lines.push(`プール自分比率,${r.rPoolSelf}`);
+  lines.push(`プール担当スタッフ比率,${r.rPoolStaff}`);
+  lines.push('');
+  lines.push('■ 計算結果');
+  lines.push('項目,金額（円）');
+  lines.push(`①回収済みシャンパン代,${fmt(r.collectedChamp)}`);
+  lines.push(`②店舗実質売上N,${fmt(r.N)}`);
+  lines.push(`③オーナー店舗取り分,${fmt(r.r03)}`);
+  lines.push(`④報酬プール,${fmt(r.r04)}`);
+  lines.push(`⑤オーナーシャンパン取り分（理論値）,${fmt(r.r05)}`);
+  lines.push(`⑥担当者シャンパン取り分（理論値）,${fmt(r.r06)}`);
+  lines.push(`⑦担当者へ本日渡すシャンパン分,${fmt(r.r07)}`);
+  lines.push(`⑧自分の取り分,${fmt(r.r08)}`);
+  lines.push(`⑨担当スタッフのプール取り分,${fmt(r.r09)}`);
+  lines.push(`⑩オーナー理論合計,${fmt(r.r10)}`);
+  lines.push(`⑪オーナーへの本日手渡し額,${fmt(r.r11)}`);
+  lines.push(`⑫担当者への本日渡す合計,${fmt(r.r12)}`);
+  lines.push(`⑬担当者の最終合計（E回収後）,${fmt(r.r13)}`);
+  lines.push('');
+  lines.push('■ 検算');
+  lines.push(`A（総売上）,${fmt(r.A)}`);
+  lines.push(`⑩+⑫+⑧の合計,${fmt(r.r10+r.r12+r.r08)}`);
+  lines.push(`一致判定,${r.checkOk ? '✅ 一致' : '⚠️ 不一致（差額：¥'+Math.abs(Math.round(r.diff)).toLocaleString()+'）'}`);
+  if(r.hasF && r.Fdiff!==null){
+    lines.push('');
+    lines.push('■ 送金済み額との照合');
+    lines.push(`F（送金済み額）,${fmt(r.F)}`);
+    lines.push(`⑪（本日手渡し額）,${fmt(r.r11)}`);
+    const diffLabel = r.Fdiff>0 ? '渡しすぎ' : r.Fdiff<0 ? '渡し足りない' : '過不足なし';
+    lines.push(`過不足（F－⑪）,${fmt(r.Fdiff)},${diffLabel}`);
+  }
+
+  const blob = new Blob([BOM+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  a.href = url;
+  a.download = `精算結果_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+};
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 初期化：保存済み比率の復元とチェック
+loadRatiosFromStorage();
+checkRatioSum('champ'); checkRatioSum('store'); checkRatioSum('pool');
+</script>
+</body>
+</html>
